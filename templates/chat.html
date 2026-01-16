@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>NEURAL BITES // AI CONCIERGE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL BITES // AI CONCIERGE</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -21,16 +22,14 @@
 
         .chat-section {
             width: 400px;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.8);
             backdrop-filter: blur(20px);
             border-right: 1px solid #333;
             display: flex;
             flex-direction: column;
             z-index: 10;
-            box-shadow: 10px 0 50px rgba(0,0,0,0.5);
         }
 
-        /* FIX 1: Added color to border-bottom */
         .header { padding: 20px; border-bottom: 1px solid #333; }
         .logo { font-family: 'Orbitron', sans-serif; color: var(--neon); font-size: 1.5rem; letter-spacing: 2px; text-shadow: 0 0 10px var(--neon); }
 
@@ -41,10 +40,12 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--neon) transparent;
         }
 
         .message {
-            max-width: 80%;
+            max-width: 85%;
             padding: 12px 18px;
             border-radius: 12px;
             font-size: 0.9rem;
@@ -56,53 +57,41 @@
         .msg-bot { align-self: flex-start; background: var(--panel); border-left: 3px solid var(--bot-msg); color: #ddd; }
         .msg-user { align-self: flex-end; background: rgba(0, 243, 255, 0.1); border-right: 3px solid var(--neon); color: var(--neon); text-align: right; }
 
-        .input-area { padding: 20px; border-top: 1px solid #333; display: flex; gap: 10px; }
-
-        input {
-            flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 6px; outline: none; transition: 0.3s;
+        .restaurant-link {
+            display: block;
+            margin-top: 8px;
+            color: var(--neon);
+            text-decoration: none;
+            font-weight: bold;
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: 0.3s;
         }
-        input:focus { border-color: var(--neon); box-shadow: 0 0 15px rgba(0, 243, 255, 0.2); }
 
+        .restaurant-link:hover { background: var(--neon); color: #000; }
+
+        .input-area { padding: 20px; border-top: 1px solid #333; display: flex; gap: 10px; }
+        input { flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 6px; outline: none; }
+        input:focus { border-color: var(--neon); }
         button { background: var(--neon); border: none; padding: 0 20px; font-weight: bold; cursor: pointer; border-radius: 6px; }
 
         .visual-section { flex: 1; position: relative; }
-        #map { width: 100%; height: 100%; z-index: 1; opacity: 0.6; }
+        #map { width: 100%; height: 100%; z-index: 1; }
 
-        .cards-overlay {
-            position: absolute; bottom: 30px; left: 30px; right: 30px;
-            display: flex; gap: 20px; overflow-x: auto; z-index: 5;
-            padding-bottom: 10px; pointer-events: none; /* Let clicks pass through to map */
-        }
-        
-        .food-card {
-            pointer-events: auto; /* Re-enable clicks on cards */
-            min-width: 250px; background: rgba(10, 10, 10, 0.9);
-            border: 1px solid var(--neon); padding: 15px;
-            border-radius: 10px; box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
-            transform: translateY(100px);
-        }
-        .food-title { font-family: 'Orbitron'; color: #fff; margin-bottom: 5px; font-size: 1.1rem; }
-        .food-type { color: #888; font-size: 0.8rem; text-transform: uppercase; }
-        .food-img { width: 100%; height: 120px; object-fit: cover; border-radius: 5px; margin-bottom: 10px; opacity: 0.8; }
-
-        @media (max-width: 768px) {
-            body { flex-direction: column; }
-            .chat-section { width: 100%; height: 40%; }
-            .visual-section { height: 60%; }
-        }
+        /* Custom Popup Style */
+        .leaflet-popup-content-wrapper { background: #111; color: white; border: 1px solid var(--neon); }
+        .leaflet-popup-tip { background: var(--neon); }
     </style>
 </head>
 <body>
 
     <div class="chat-section">
-        <div class="header">
-            <div class="logo">NEURAL BITES</div>
-        </div>
+        <div class="header"><div class="logo">NEURAL BITES</div></div>
         <div class="chat-window" id="chatbox">
             <div class="message msg-bot" id="intro-msg">
                 SYSTEM ONLINE. <br>
-                Tell me what you crave and which city you are in.<br>
-                (e.g., "I want spicy food in New York")
+                Tell me what you crave and which city you are in.
             </div>
         </div>
         <div class="input-area">
@@ -113,18 +102,13 @@
 
     <div class="visual-section">
         <div id="map"></div>
-        <div class="cards-overlay" id="cardContainer"></div>
     </div>
 
     <script>
-        gsap.to("#intro-msg", { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" });
+        gsap.to("#intro-msg", { opacity: 1, y: 0, duration: 0.8 });
 
         const map = L.map('map').setView([20, 0], 2);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CARTO',
-            subdomains: 'abcd',
-            maxZoom: 19
-        }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
         let markers = [];
 
@@ -137,8 +121,7 @@
 
             addMessage(txt, 'user');
             input.value = '';
-
-            const loadId = addMessage("Analyzing neural pathways...", 'bot');
+            const loadId = addMessage("Scanning sectors...", 'bot');
 
             try {
                 const response = await fetch('/api/ask', {
@@ -150,14 +133,11 @@
 
                 document.getElementById(loadId).innerHTML = data.reply;
                 
-                // FIX 5: Check if places exists to prevent crash
                 if(data.location && data.places) {
                     updateMap(data.location, data.places);
                 }
-
             } catch (err) {
-                console.error(err);
-                document.getElementById(loadId).innerHTML = "CONNECTION ERROR. RE-ALIGNING SATELLITE.";
+                document.getElementById(loadId).innerHTML = "CRITICAL ERROR: UPLINK FAILED.";
             }
         }
 
@@ -170,46 +150,48 @@
             div.innerHTML = text;
             box.appendChild(div);
             box.scrollTop = box.scrollHeight;
-            gsap.to(div, { opacity: 1, y: 0, duration: 0.5 });
+            gsap.to(div, { opacity: 1, y: 0, duration: 0.4 });
             return id;
         }
 
         function updateMap(loc, places) {
+            // Remove old markers
             markers.forEach(m => map.removeLayer(m));
             markers = [];
-            const container = document.getElementById('cardContainer');
-            container.innerHTML = '';
+            
+            // Zoom to location
+            map.flyTo([loc.lat, loc.lon], 14, { duration: 2 });
 
-            if (places.length === 0) {
-                return;
-            }
+            if (places.length > 0) {
+                const box = document.getElementById('chatbox');
+                const listDiv = document.createElement('div');
+                listDiv.className = "message msg-bot";
+                let html = "<strong>LOCATIONS FOUND:</strong><br>";
 
-            map.flyTo([loc.lat, loc.lon], 13, { duration: 2.5 });
+                places.forEach(p => {
+                    // Create Map Marker
+                    const m = L.circleMarker([p.lat, p.lon], {
+                        color: '#00f3ff', fillColor: '#00f3ff', fillOpacity: 0.8, radius: 10
+                    }).addTo(map);
+                    
+                    // Add Popup with Google Maps link to Pin
+                    m.bindPopup(`
+                        <div style="color:white;">
+                            <strong>${p.name}</strong><br>
+                            <a href="${p.link}" target="_blank" style="color:#00f3ff; text-decoration:none;">View on Google Maps ↗</a>
+                        </div>
+                    `);
+                    markers.push(m);
 
-            places.forEach((p, index) => {
-                const m = L.circleMarker([p.lat, p.lon], {
-                    color: '#00f3ff', radius: 8, fillOpacity: 0.8
-                }).addTo(map).bindPopup(p.name);
-                markers.push(m);
-
-                const card = document.createElement('div');
-                card.className = 'food-card';
-                
-                // FIX 2: Replaced broken Unsplash source with loremflickr
-                card.innerHTML = `
-                    <img class="food-img" src="https://loremflickr.com/400/300/${p.type},dinner/all" alt="food">
-                    <div class="food-title">${p.name}</div>
-                    <div class="food-type">Detected: ${p.type}</div>
-                `;
-                container.appendChild(card);
-
-                gsap.to(card, { 
-                    y: 0, 
-                    duration: 0.8, 
-                    delay: 0.5 + (index * 0.1), 
-                    ease: "back.out(1.7)" 
+                    // Build list for Chatbox
+                    html += `<a href="${p.link}" target="_blank" class="restaurant-link">${p.name} ↗</a>`;
                 });
-            });
+
+                listDiv.innerHTML = html;
+                box.appendChild(listDiv);
+                box.scrollTop = box.scrollHeight;
+                gsap.to(listDiv, { opacity: 1, y: 0, duration: 0.4 });
+            }
         }
     </script>
 </body>
