@@ -5,24 +5,24 @@ import requests
 import boto3
 from flask import Flask, render_template, request, jsonify, session
 
-# 1. Setup Logging
+# 1. Setup Logging - Crucial for debugging 502 errors
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 2. Initialize Flask - MUST be named 'application' for Elastic Beanstalk
 application = Flask(__name__)
-# Required for session memory
-application.secret_key = secrets.token_hex(16)
+application.secret_key = secrets.token_hex(16)  # Required for session storage
 
-# 2. AWS Lex Configuration (Replace with your IDs)
-LEX_CLIENT = boto3.client('lexv2-runtime', region_name='us-east-1') # Ensure region matches your bot
-BOT_ID = 'YOUR_BOT_ID'
-BOT_ALIAS_ID = 'YOUR_BOT_ALIAS_ID'
+# 3. AWS Lex Configuration
+# Make sure region_name matches where your Lex bot is hosted
+LEX_CLIENT = boto3.client('lexv2-runtime', region_name='us-east-1')
+BOT_ID = 'YOUR_BOT_ID'           # Paste your Bot ID here
+BOT_ALIAS_ID = 'YOUR_ALIAS_ID'   # Paste your Bot Alias ID here
 
 def find_restaurants(lat, lon, cuisine_type):
     """Fetch restaurant data from Overpass API (OpenStreetMap)"""
     try:
         overpass_url = "http://overpass-api.de/query"
-        # Search for the specific cuisine or general restaurants within 5km
         query = f"""
         [out:json];
         (
@@ -61,64 +61,67 @@ def home():
 def ask_ai():
     data = request.get_json()
     user_input = data.get('message', '')
-    session_id = session.get('user_sid', secrets.token_hex(8))
-    session['user_sid'] = session_id
+    
+    # Session management for Lex and City memory
+    if 'user_sid' not in session:
+        session['user_sid'] = secrets.token_hex(8)
+    
+    session_id = session['user_sid']
 
     try:
-        # 3. Talk to Amazon Lex
+        # Send message to Amazon Lex V2
         lex_response = LEX_CLIENT.recognize_text(
-            botId= IQ8SBPJUJC,
-            botAliasId= IQ8SBPJUJC,
+            botId=IQ8SBPJUJC,
+            botAliasId=IQ8SBPJUJC,
             localeId='en_US',
             sessionId=session_id,
             text=user_input
         )
 
-        # 4. Extract Intent and Slots
+        # Process Lex Interpretation
         interpretations = lex_response.get('interpretations', [])
         if not interpretations:
-            return jsonify({"reply": "Neural Link failed to interpret. Try again."})
+            return jsonify({"reply": "Neural pathways unstable. Try again."})
 
         top_intent = interpretations[0].get('intent', {})
         slots = top_intent.get('slots', {})
 
-        # Extract values Lex found
+        # Extract Slot Values
         cuisine = slots.get('Cuisine', {}).get('value', {}).get('interpretedValue', 'restaurant')
         city_name = slots.get('City', {}).get('value', {}).get('interpretedValue', None)
 
-        # 5. Handle City Memory
+        # Persistence: If a new city is mentioned, update session
         if city_name:
             location = geocode_city_name(city_name)
             if location:
                 session['last_city'] = location
         
+        # Default to Surat if no city has ever been mentioned
         current_loc = session.get('last_city', {"lat": 21.1702, "lon": 72.8311, "name": "Surat"})
 
-        # 6. Get Food Locations
+        # Get restaurant results
         places_data = find_restaurants(current_loc['lat'], current_loc['lon'], cuisine)
         
         response_places = []
         for p in places_data:
             name = p.get("tags", {}).get("name", "Unknown Spot")
-            # Google Maps Redirect Link
-            gmaps_link = f"https://www.google.com/maps/search/?api=1&query={p['lat']},{p['lon']}"
             response_places.append({
                 "name": name,
                 "lat": p["lat"],
                 "lon": p["lon"],
-                "link": gmaps_link
+                "link": f"https://www.google.com/maps?q={p['lat']},{p['lon']}"
             })
 
         return jsonify({
-            "reply": f"Targeting {cuisine.upper()} sectors in {current_loc['name']}.",
+            "reply": f"Scanning {cuisine.upper()} sectors in {current_loc['name']}...",
             "location": current_loc,
             "places": response_places
         })
 
     except Exception as e:
         logger.error(f"App Error: {e}")
-        return jsonify({"reply": "Neural pathways disrupted. Re-link required."}), 500
+        return jsonify({"reply": "Neural Link Error: Check your Bot ID and Permissions."}), 500
 
+# Required for Elastic Beanstalk
 if __name__ == '__main__':
-    # AWS EB listens on 5000 by default
     application.run(host='0.0.0.0', port=5000)
